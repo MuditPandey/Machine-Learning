@@ -41,47 +41,11 @@ void candidate_elimination(vector<vector<int> > training,int class_val)
                     vector<vector<int> > add=minimal_generlization(Spec[i],traning[i],class_val);
                     Spec.erase(Spec.begin()+i);
                     i--;
-                    for(int j=0;j<add.size();j++)
-                    {
-                        int gen=0;
-                        for(int k=0;k<add[j].size();k++)
-                        {
-                            if(add[j][k]==-1)
-                                gen++;
-                        }
-                        if(exist_more_gen(Gen,gen))
-                            Spec.push_back(add[j]);
-                    }
 
                 }
                 int min_gen=INT_MAX;
-                //find least general hypothesis in S
-                for(int j=0;j<Spec.size();j++)
-                {
-                    int gen=0;
-                    for(int k=0;k<Spec[j].size();k++)
-                    {
-                        if(Spec[j][k]==-1)
-                            gen++;
-                    }
-                    if(gen<min_gen)
-                        min_gen=gen;
-                }
                 //Remove all hypothesis which are more general than any hypothesis in S
-                for(int j=0;j<Spec.size();j++)
-                {
-                    int gen=0;
-                    for(int k=0;k<Spec[j].size();k++)
-                    {
-                        if(Spec[j][k]==-1)
-                            gen++;
-                    }
-                    if(gen>min_gen)
-                    {
-                         Spec.erase(Spec.begin()+j);
-                         j--;
-                    }
-                }
+
             }
 
 
@@ -104,84 +68,53 @@ void candidate_elimination(vector<vector<int> > training,int class_val)
                     vector<vector<int> > add=minimal_specialization(Gen[i],traning[i],class_val);
                     Gen.erase(Gen.begin()+i);
                     i--;
-                    for(int j=0;j<add.size();j++)
-                    {
-                        int gen=0;
-                        for(int k=0;k<add[j].size();k++)
-                        {
-                            if(add[j][k]==-1)
-                                gen++;
-                        }
-                        if(exist_more_spec(Spec,gen))
-                            Gen.push_back(add[j]);
-                    }
+
                 }
                 int max_gen=INT_MIN;
                 //find most general hypothesis in G
-                for(int j=0;j<Gen.size();j++)
-                {
-                    int gen=0;
-                    for(int k=0;k<Gen[j].size();k++)
-                    {
-                        if(Gen[j][k]==-1)
-                            gen++;
-                    }
-                    if(gen>max_gen)
-                        max_gen=gen;
-                }
+
                 //Remove all hypothesis which are less general than any in G
-                for(int j=0;j<Spec.size();j++)
-                {
-                    int gen=0;
-                    for(int k=0;k<Spec[j].size();k++)
-                    {
-                        if(Spec[j][k]==-1)
-                            gen++;
-                    }
-                    if(gen<max_gen)
-                    {
-                         Spec.erase(Spec.begin()+j);
-                         j--;
-                    }
-                }
-            }
+
         }
     }
 }
-bool exist_more_spec(vector< vector<int> > hypot_set,int val)
+
+bool is_gen(vector<int> hypot1,vector<int> hypot2)
 {
-    for(int i=0;i<hypot_set.size();i++)
+    //Checks if hypot1 is more general than hypot2
+    if(hypot1.size()!=hypot2.size())
     {
-        int gen;
-        for(int j=0;j<hypot_set[i].size()j++)
-        {
-            if(hypot_set[i][j]==-1)
-                gen++;
-        }
-        if(gen<val)
-            return true;
+        cout<<"Hypothesis of different sizes!"<<endl;\
+        return false;
     }
-    return false;
-}
-bool exist_more_gen(vector< vector<int> > hypot_set,int val)
-{
-    for(int i=0;i<hypot_set.size();i++)
+    bool gen=true;
+    for(int i=0;i<hypot1.size();i++)
     {
-        int gen;
-        for(int j=0;j<hypot_set[i].size()j++)
+        if(hypot1[i]==-1)
+            continue;
+        if(hypot1[i]!=hypot2[i])
         {
-            if(hypot_set[i][j]==-1)
-                gen++;
+            gen=false;
+            break;
         }
-        if(gen>val)
-            return true;
     }
-    return false;
+    return gen;
 }
 vector<vector<int> > minimal_generlization(vector<int> hypothesis,vector<int> example,int target_class)
 {
     //return all minimal generalizations of hypothesis consistent with example
-
+    for(int i=0;i<hypothesis.size();i++)
+    {
+        if(hypothesis[i]==-1)
+            continue;
+        if(hypothesis[i]!=example[i])
+        {
+            hypothesis[i]=-1;
+        }
+    }
+    vector<vector<int> > ret;
+    ret.push_back(hypothesis);
+    return ret;
 }
 vector<vector<int> > minimal_specialization(vector<int> hypothesis,vector<int> example,int target_class)
 {
