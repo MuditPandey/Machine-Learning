@@ -8,6 +8,8 @@ vector<vector<int> > data;
 map<int,string> attribute_name;
 map<int,set<int> > attribute_val;
 
+void print_vv(vector<vector<int> > );
+void print_v(vector<int>);
 bool is_gen(vector<int>,vector<int> );
 void init();
 void load_data();
@@ -45,26 +47,36 @@ void candidate_elimination(vector<vector<int> > training,int class_val)
     }
     Gen.push_back(G);
     Spec.push_back(S);
+    //print_vv(training);
     for(int i=0;i<training.size();i++)
     {
+        cout<<"----------Training example:"<<i<<"---------------"<<endl;
+        cout<<"Training ex:";
+        print_v(training[i]);
         if(training[i][training[i].size()-1]==class_val)
         {
             //Positive example
-            for(int i=0;i<Gen.size();i++)
+            cout<<"Positive!"<<endl;
+            for(int j=0;j<Gen.size();j++)
             {
-                if(!consistent(Gen[i],training[i],class_val))
+                if(!consistent(Gen[j],training[i],class_val))
                 {
-                    Gen.erase(Gen.begin()+i);
-                    i--;
+                    cout<<"Inconsistent!"<<endl;
+                    Gen.erase(Gen.begin()+j);
+                    j--;
                 }
             }
-            for(int i=0;i<Spec.size();i++)
+            cout<<"Gen: ";
+            print_vv(Gen);
+            for(int p=0;p<Spec.size();p++)
             {
-                if(!consistent(Spec[i],training[i],class_val))
+                if(!consistent(Spec[p],training[i],class_val))
                 {
-                    vector<vector<int> > add=minimal_generlization(Spec[i],training[i]);
-                    Spec.erase(Spec.begin()+i);
-                    i--;
+                    cout<<"Spec inconsistent!"<<endl;
+                    vector<vector<int> > add=minimal_generlization(Spec[p],training[i]);
+                    print_vv(add);
+                    Spec.erase(Spec.begin()+p);
+                    p--;
                     for(int j=0;j<add.size();j++)
                     {
                         bool add_flag=false;
@@ -97,6 +109,8 @@ void candidate_elimination(vector<vector<int> > training,int class_val)
                           }
                      }
                 }
+                cout<<"Spec: ";
+                print_vv(Spec);
 
             }
 
@@ -105,20 +119,23 @@ void candidate_elimination(vector<vector<int> > training,int class_val)
         else
         {
             //Negative example
-            for(int i=0;i<Spec.size();i++)
+            cout<<"Negative!"<<endl;
+            for(int j=0;j<Spec.size();j++)
             {
-                if(!consistent(Spec[i],training[i],class_val))
+                if(!consistent(Spec[j],training[i],class_val))
                 {
-                    Spec.erase(Spec.begin()+i);
-                    i--;
+                    Spec.erase(Spec.begin()+j);
+                    j--;
                 }
             }
-            for(int i=0;i<Gen.size();i++)
+            for(int l=0;l<Gen.size();l++)
             {
-                if(!consistent(Gen[i],training[i],class_val))
+                if(!consistent(Gen[l],training[i],class_val))
                 {
-                    vector<vector<int> > add=minimal_specialization(Gen[i],training[i]);
-                    Gen.erase(Gen.begin()+i);
+                    cout<<"Gen inconsistent!"<<endl;
+                    vector<vector<int> > add=minimal_specialization(Gen[l],training[i]);
+                    print_vv(add);
+                    Gen.erase(Gen.begin()+l);
                     i--;
                     for(int j=0;j<add.size();j++)
                     {
@@ -182,8 +199,11 @@ bool is_gen(vector<int> hypot1,vector<int> hypot2)
 vector<vector<int> > minimal_generlization(vector<int> hypothesis,vector<int> example)
 {
     //return all minimal generalizations of hypothesis consistent with example
+    cout<<"Min-gen"<<endl;
     for(int i=0;i<hypothesis.size();i++)
     {
+        if(hypothesis[i]==100)
+            hypothesis[i]=example[i];
         if(hypothesis[i]==-1)
             continue;
         if(hypothesis[i]!=example[i])
@@ -199,6 +219,7 @@ vector<vector<int> > minimal_specialization(vector<int> hypothesis,vector<int> e
 {
     //return all minimal specializations of hypothesis consistent with example
     vector<vector<int> > ret;
+    cout<<"Min-Spec"<<endl;
     for(int i=0;i<hypothesis.size();i++)
     {
         if(hypothesis[i]==example[i])
@@ -206,7 +227,7 @@ vector<vector<int> > minimal_specialization(vector<int> hypothesis,vector<int> e
         if(hypothesis[i]==-1)
         {
 
-            for(set<int>::iterator it=attribute_val[i].begin();it!=attribute_val[i].end();i++)
+            for(set<int>::iterator it=attribute_val[i].begin();it!=attribute_val[i].end();it++)
             {
                 vector<int> add=hypothesis;
                 if(example[i]!=*it)
@@ -221,20 +242,24 @@ vector<vector<int> > minimal_specialization(vector<int> hypothesis,vector<int> e
     }
     return ret;
 }
-bool consistent(vector<int> hypothesis, vector<int> example,int target_class)
+bool consistent(vector<int> hypothesis, vector<int> ex,int target_class)
 {
-    if(example.size()!=hypothesis.size()+1)
+    cout<<"hypo:";
+    print_v(hypothesis);
+    cout<<"example:";
+    print_v(ex);
+    if(ex.size()!=hypothesis.size()+1)
     {
         cout<<"Error in size of hypothesis and example!"<<endl;
         return false;
     }
-    int result_class=example[example.size()-1];
+    int result_class=ex[ex.size()-1];
     bool cons=true;
-    for(int i=0;i<hypothesis.size() && i<example.size()-1;i++)
+    for(int i=0;i<hypothesis.size() && i<ex.size()-1;i++)
     {
         if(hypothesis[i]==-1)
             continue;
-        if(hypothesis[i]!=example[i])
+        if(hypothesis[i]!=ex[i])
         {
             cons=false;
             break;
@@ -302,7 +327,23 @@ void init()
     add.insert(7);
     attribute_val[16]=add;
 }
-
+void print_vv(vector<vector<int> >  add)
+{
+    for(int p=0;p<add.size();p++)
+    {
+        for(int d=0;d<add[p].size();d++)
+            cout<<add[p][d]<<",";
+            cout<<endl;
+    }
+}
+void print_v(vector<int> add)
+{
+    for(int p=0;p<add.size();p++)
+    {
+            cout<<add[p]<<",";
+    }
+     cout<<endl;
+}
 void load_data()
 {
     fstream fil;
