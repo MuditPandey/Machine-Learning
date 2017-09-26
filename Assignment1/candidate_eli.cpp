@@ -8,17 +8,17 @@ vector<vector<int> > data;
 map<int,string> attribute_name;
 map<int,set<int> > attribute_val;
 
-bool vector_equal(vector<int> ,vector<int> );
-void print_vv(vector<vector<int> > );
-void print_v(vector<int>);
-bool is_gen(vector<int>,vector<int> );
+bool vector_equal(vector<int> &,vector<int> &);
+void print_vv(vector<vector<int> > &);
+void print_v(vector<int> &);
+bool is_gen(vector<int> &,vector<int> &);
 void init();
 void load_data();
-bool consistent(vector<int> , vector<int> ,int);
-void candidate_elimination(vector<vector<int> > ,int );
-vector<vector<int> > minimal_generlization(vector<int>,vector<int>,vector<vector<int> >);
-vector<vector<int> > minimal_specialization(vector<int> ,vector<int> ,vector<vector<int> >);
-
+bool consistent(vector<int> &, vector<int> &,int &);
+void candidate_elimination(vector<vector<int> > &,int &);
+vector<vector<int> > minimal_generlization(vector<int> ,vector<int> &,vector<vector<int> > &);
+vector<vector<int> > minimal_specialization(vector<int> ,vector<int> &,vector<vector<int> > &);
+bool check_valid(vector<vector<int> > &,vector<vector<int> > &, vector<vector< int> > &,int );
 
 int main()
 {
@@ -27,16 +27,16 @@ int main()
     cout<<"Done.\nLoading training data.\n";
     load_data();
     cout<<"Done\n";
-    for(int i=1;i<=1;i++)
+    for(int i=1;i<=7;i++)
     {
-        cout<<"For:"<<i<<endl;
+        //cout<<"For:"<<i<<endl;
         candidate_elimination(data,i);
     }
     return 0;
 }
 
 
-void candidate_elimination(vector<vector<int> > training,int class_val)
+void candidate_elimination(vector<vector<int> > &training,int &class_val)
 {
     cout<<"***************************************** CLASS "<<class_val<<" ************************************************\n";
     vector< vector<int> > Gen;
@@ -52,20 +52,21 @@ void candidate_elimination(vector<vector<int> > training,int class_val)
     //print_vv(training);
     for(int i=0;i<training.size();i++)
     {
-        cout<<"----------Training example:"<<i<<"---------------"<<endl;
-        cout<<"Training ex:";
-        print_v(training[i]);
+        cout << i << "-> ";
+        //cout<<"----------Training example:"<<i<<"---------------"<<endl;
+        //cout<<"Training ex:";
+        //print_v(training[i]);
         if(training[i][training[i].size()-1]==class_val)
         {
             //Positive example
-            cout<<"Positive!"<<endl;
+            //cout<<"Positive!"<<endl;
             for(int j=0;j<Gen.size();j++)
             {
                 if(!consistent(Gen[j],training[i],class_val))
                 {
-                    cout<<"Gen ";
-                    print_v(Gen[j]);
-                    cout<<" inconsistent!"<<endl;
+                    //cout<<"Gen ";
+                    //print_v(Gen[j]);
+                    //cout<<" inconsistent!"<<endl;
                     Gen.erase(Gen.begin()+j);
                     j--;
                 }
@@ -77,16 +78,16 @@ void candidate_elimination(vector<vector<int> > training,int class_val)
                 if(!consistent(Spec[p],training[i],class_val))
                 {
                     //Remove inconsistent Spec
-                    cout<<"Spec inconsistent ..!"<<endl;
+                    //cout<<"Spec inconsistent ..!"<<endl;
                     vector<int> x=Spec[p];
-                    cout<<"Removing:";
-                    print_v(Spec[p]);
-                    cout<<"\n";
+                    //cout<<"Removing:";
+                    //print_v(Spec[p]);
+                    //cout<<"\n";
                     Spec.erase(Spec.begin()+p);
                     p--;
                     //get minimal generalization
                     vector<vector<int> > add=minimal_generlization(x,training[i],Gen);
-                    print_vv(add);
+                    //print_vv(add);
                     for(int j=0;j<add.size();j++)
                         Spec.push_back(add[j]);
                     //Remove from S any hypothesis that is more general than any other
@@ -116,14 +117,14 @@ void candidate_elimination(vector<vector<int> > training,int class_val)
         else
         {
             //Negative example
-            cout<<"Negative!"<<endl;
+            //cout<<"Negative!"<<endl;
             for(int j=0;j<Spec.size();j++)
             {
                 if(!consistent(Spec[j],training[i],class_val))
                 {
-                    cout<<"Spec ";
-                    print_v(Spec[j]);
-                    cout<<" inconsistent!"<<endl;
+                    //cout<<"Spec ";
+                   // print_v(Spec[j]);
+                    //cout<<" inconsistent!"<<endl;
                     Spec.erase(Spec.begin()+j);
                     j--;
                 }
@@ -132,15 +133,15 @@ void candidate_elimination(vector<vector<int> > training,int class_val)
             {
                 if(!consistent(Gen[p],training[i],class_val))
                 {
-                    cout<<"Gen inconsistent ..!"<<endl;
+                    //cout<<"Gen inconsistent ..!"<<endl;
                     vector<int> x=Gen[p];
-                    cout<<"Removing:";
-                    print_v(Gen[p]);
-                    cout<<"\n";
+                    //cout<<"Removing:";
+                    //print_v(Gen[p]);
+                    //cout<<"\n";
                     Gen.erase(Gen.begin()+p);
                     p--;
                     vector<vector<int> > add=minimal_specialization(x,training[i],Spec);
-                    print_vv(add);
+                    //print_vv(add);
                     for(int j=0;j<add.size();j++)
                         Gen.push_back(add[j]);
                     //Remove from G any hypothesis less general than any in G
@@ -152,10 +153,9 @@ void candidate_elimination(vector<vector<int> > training,int class_val)
                             {
                                 if(is_gen(Gen[j],Gen[k]))
                                 {
-                                    print_v(Gen[j]);
-                                    cout<<" more gen than ";
-                                    print_v(Gen[k]);
-                                    cout<<" .Removing\n";
+                                    //cout<<"Removing less gen: ";
+                                    //print_v(Gen[k]);
+                                    //cout<<endl;
                                     Gen.erase(Gen.begin()+k);
                                     k--;
                                     break;
@@ -167,15 +167,32 @@ void candidate_elimination(vector<vector<int> > training,int class_val)
                 }
             }
         }
-        cout<<"Gen_fin:";
-        print_vv(Gen);
-        cout<<"Spec_fin:";
-        print_vv(Spec);
+        if(Gen.empty() || Spec.empty())
+        {
+            cout<<"\nHypothesis not in hypothesis space for class " << class_val << endl;
+            return;
+        }
+        //cout << "gen: " << Gen.size() << ", spec: " << Spec.size() << endl;
+        //cout<<"Gen_fin:";
+        //print_vv(Gen);
+        //cout<<"Spec_fin:";
+        //print_vv(Spec);
     }
+    cout << "\n-------------------RESULTS---------------------------" << endl;
     cout<<"G="<<Gen.size()<<" S="<<Spec.size()<<endl;
+    cout<<"GEN:";
+    print_vv(Gen);
+    cout<<"SPEC:";
+    print_vv(Spec);
+    if(check_valid(Spec,Gen,training,class_val))
+    {
+        cout<<"VALID RESULT!\n";
+    }
+    else
+        cout<<"INVALID RESULT!\n";
 
 }
-bool is_gen(vector<int> hypot1,vector<int> hypot2)
+bool is_gen(vector<int> &hypot1,vector<int> &hypot2)
 {
     //Checks if hypot1 is more general than hypot2
     if(hypot1.size()!=hypot2.size())
@@ -196,10 +213,10 @@ bool is_gen(vector<int> hypot1,vector<int> hypot2)
     }
     return gen;
 }
-vector<vector<int> > minimal_generlization(vector<int> hypothesis,vector<int> example,vector<vector<int> > Gen)
+vector<vector<int> > minimal_generlization(vector<int> hypothesis,vector<int> &example,vector<vector<int> > &Gen)
 {
     //return all minimal generalizations of hypothesis consistent with example
-    cout<<"Min-gen"<<endl;
+    //cout<<"Min-gen"<<endl;
     for(int i=0;i<hypothesis.size();i++)
     {
         if(hypothesis[i]==100)
@@ -225,10 +242,10 @@ vector<vector<int> > minimal_generlization(vector<int> hypothesis,vector<int> ex
         ret.push_back(hypothesis);
     return ret;
 }
-vector<vector<int> > minimal_specialization(vector<int> hypothesis,vector<int> example,vector<vector<int> > Spec)
+vector<vector<int> > minimal_specialization(vector<int> hypothesis,vector<int> &example,vector<vector<int> > &Spec)
 {
     //return all minimal specializations of hypothesis consistent with example
-    cout<<"Min-spec"<<endl;
+    //cout<<"Min-spec"<<endl;
     vector<vector<int> > ret;
     for(int i=0;i<hypothesis.size();i++)
     {
@@ -246,7 +263,7 @@ vector<vector<int> > minimal_specialization(vector<int> hypothesis,vector<int> e
                     bool flag=false;
                     for(int i=0;i<Spec.size();i++)
                     {
-                        if(is_gen(hypothesis,Spec[i]))
+                        if(is_gen(add,Spec[i]))
                         {
                             flag=true;
                             break;
@@ -262,7 +279,7 @@ vector<vector<int> > minimal_specialization(vector<int> hypothesis,vector<int> e
     }
     return ret;
 }
-bool consistent(vector<int> hypothesis, vector<int> ex,int target_class)
+bool consistent(vector<int> &hypothesis, vector<int> &ex,int &target_class)
 {
     //cout<<"hypo:";
     //print_v(hypothesis);
@@ -347,24 +364,28 @@ void init()
     add.insert(7);
     attribute_val[16]=add;
 }
-void print_vv(vector<vector<int> >  add)
+void print_vv(vector<vector<int> >  &add)
 {
     for(int p=0;p<add.size();p++)
     {
-        for(int d=0;d<add[p].size();d++)
-            cout<<add[p][d]<<",";
+        print_v(add[p]);
             cout<<endl;
     }
 }
-void print_v(vector<int> add)
+void print_v(vector<int> &add)
 {
     for(int p=0;p<add.size();p++)
     {
-            cout<<add[p]<<",";
+            if (add[p] == -1)
+                cout << "?,";
+            else if (add[p] == 100)
+                cout << "@,";
+            else
+                cout<<add[p]<<",";
     }
      //cout<<endl;
 }
-bool vector_equal(vector<int> a,vector<int> b)
+bool vector_equal(vector<int> &a,vector<int> &b)
 {
     if(a.size()!=b.size())
         return false;
@@ -407,3 +428,31 @@ void load_data()
     }
     fil.close();
 }
+bool check_valid(vector<vector<int> > &Spec,vector<vector<int> > &Gen, vector<vector< int> > &training,int class_val)
+{
+   for(int i=0;i<training.size();i++)
+   {
+       for(int j=0;j<Spec.size();j++)
+       {
+           if(!consistent(Spec[j],training[i],class_val))
+           {
+               cout<<"Spec :";
+               print_v(Spec[j]);
+               cout<<" inconsistent!\n";
+               return false;
+           }
+       }
+       for(int j=0;j<Gen.size();j++)
+       {
+           if(!consistent(Gen[j],training[i],class_val))
+           {
+               cout<<"Gen :";
+               print_v(Gen[j]);
+               cout<<" inconsistent!\n";
+               return false;
+           }
+       }
+   }
+   return true;
+}
+
