@@ -152,7 +152,10 @@ void candidate_elimination(vector<vector<int> > training,int class_val)
                             {
                                 if(is_gen(Gen[j],Gen[k]))
                                 {
-                                    cout<<"Removing less gen..\n";
+                                    print_v(Gen[j]);
+                                    cout<<" more gen than ";
+                                    print_v(Gen[k]);
+                                    cout<<" .Removing\n";
                                     Gen.erase(Gen.begin()+k);
                                     k--;
                                     break;
