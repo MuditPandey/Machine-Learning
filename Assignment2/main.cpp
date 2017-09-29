@@ -1,7 +1,11 @@
+#include <fstream>
+#include <sstream>
 #include <iostream>
 #include <set>
 #include <algorithm>
 #include <vector>
+#include <type_traits>
+#include <limits.h>
 
 using namespace std;
 
@@ -11,8 +15,10 @@ struct node
     vector <node*> nextAtt;
 } valTrue, valFalse;
 
-void loadData(vector <vector <int> > &data); //for fixing continuous data and ? and marking all attributes from 0 to n -> load the data
-void setAttributes(set <pair <int, int> > &attributes); //just initializes all the attributes... nothing much (have to hard code this)
+double done = 0;
+double dataSize;
+
+void loadData(vector <vector <int> > &data, set <pair <int, int> > &attributes, bool test = false); //for fixing continuous data and ? and marking all attributes from 0 to n -> load the data
 node *ID3(vector <vector <int> > &data, set <pair <int, int> > &attributes);
 node *checkSame(vector <vector <int> > &data); //returns valTrue/valFalse if all the data have the same val, otherwise returns NULL
 node *doVoting(vector <vector <int> > &data); //returns valTrue/valFalse based on voting
@@ -21,88 +27,352 @@ double calcEntropy(int, int);
 void cutData(vector <vector <int> > &data, int, int, vector <vector <int> > &vdata); //also removes the attribute maxAtt from data
 void printTree(node*, int tabs = 0);
 void printData(vector <vector <int> >);
+void discretizeData(int attNum, vector <vector <int> > &data);
+void fillMissingData(vector <vector <int> > &data, set <pair <int, int> > &attributes);
+double testData(vector <vector <int> > &testData, node *root);
+
+void space_modifier()
+{
+    ifstream fin;
+    ofstream fout;
+    fin.open("test.txt");
+    fout.open("test_output.txt");
+    string str;
+    while(getline(fin, str))
+    {
+        bool space = false;
+        for (int i = 0; i < str.size(); ++i)
+        {
+            if ((str[i] == ' ' || str[i] == '\t') && !space)
+            {
+                fout << ",";
+                space = true;
+            }
+            else if (str[i] != ' ' && str[i] != '\t')
+            {
+                if (str[i] != ',' && str[i] != '.')
+                    fout << str[i];
+                space = false;
+            }
+        }
+        fout << endl;
+    }
+    fin.close();
+    fout.close();
+}
 
 int main()
 {
     valTrue.attribute.first = -1;
     valFalse.attribute.first = -2;
 
-    vector <vector <int> > data;
-    loadData(data);
+    //space_modifier();
+    //return 0;
+
+    vector <vector <int> > data, dataTest;
     set <pair <int, int> > attributes; //first int is the attribute number and the second is the number of values of the attribute
-    setAttributes(attributes);
+    cout << "preprocessing given data" << endl;
+    loadData(data, attributes);
+    dataSize = data.size();
+    cout << "running ID3" << endl;
     node *root = ID3(data, attributes);
-    printTree(root);
+    //printTree(root);
+    cout << "preprocessing test data" << endl;
+    loadData(dataTest, attributes, true);
+    cout << "testing data with decision tree" << endl;
+    cout << "Accuracy is: " << testData(dataTest, root);
 }
 
-void loadData(vector <vector <int> > &data)
+double testData(vector <vector <int> > &dataTest, node *root)
 {
-    data = {
-        {0, 1, 2, 3, 4}, //attribute numbers
-        {1, 0, 0, 0, 0},
-        {1, 0, 0, 1, 0},
-        {2, 0, 0, 0, 1},
-        {0, 2, 0, 0, 1},
-        {0, 1, 1, 0, 1},
-        {0, 1, 1, 1, 0},
-        {2, 1, 1, 1, 1},
-        {1, 2, 0, 0, 0},
-        {1, 1, 1, 0, 1},
-        {0, 2, 1, 0, 1},
-        {1, 2, 1, 1, 1},
-        {2, 2, 0, 1, 1},
-        {2, 0, 1, 0, 1},
-        {0, 2, 0, 1, 0}
-    };
-}
-
-void setAttributes(set <pair <int, int> > &attributes)
-{
-    vector <int> numValues = {3, 3, 2, 2, -1};
-    //{1, 8, 1, 16, 7, 14, 6, 5, 2, 1, 1, 1, 41, 2};
-    for (int i = 0; i < numValues.size(); ++i)
+    int passed = 0, lastCol = dataTest[0].size() - 1;
+    for (int i = 1; i < dataTest.size(); ++i)
     {
-        pair <int, int> attribute = pair <int, int> (i, numValues[i]);
-        attributes.insert(attribute);
+        //for (int j = 0; j <= lastCol; ++j)
+            //cout << dataTest[i][j] << " ";
+        //cout << endl;
+        node *traverse = root;
+        while (traverse->attribute.first >= 0)
+        {
+            //cout << endl;
+            //cout << "attribute: " << traverse->attribute.first << endl;
+            //cout << "nextAtt array size: " << traverse->nextAtt.size() << endl;
+            //cout << "data[i][j]: " << dataTest[i][traverse->attribute.first] << endl;
+            traverse = traverse->nextAtt[dataTest[i][traverse->attribute.first]];
+        }
+        //cout << endl;
+        if (traverse->attribute.first + 2 == dataTest[i][lastCol])
+            ++passed;
     }
+    return (double)passed / (dataTest.size() - 1);
+}
+
+void loadData(vector <vector <int> > &data, set <pair <int, int> > &attributes, bool test)
+{
+    ifstream fin;
+    if (test)
+        fin.open("test_output.txt");
+    else
+        fin.open("data_output.txt");
+    string line;
+    vector <vector <string> > valNames = {
+        {"0", "1"},
+        {"Private", "Self-emp-not-inc", "Self-emp-inc", "Federal-gov", "Local-gov", "State-gov", "Without-pay", "Never-worked"},
+        {"0", "1"},
+        {"Bachelors", "Some-college", "11th", "HS-grad", "Prof-school", "Assoc-acdm", "Assoc-voc", "9th", "7th-8th", "12th", "Masters", "1st-4th", "10th", "Doctorate", "5th-6th", "Preschool"},
+		{"0", "1"},
+        {"Married-civ-spouse", "Divorced", "Never-married", "Separated", "Widowed", "Married-spouse-absent", "Married-AF-spouse"},
+        {"Tech-support", "Craft-repair", "Other-service", "Sales", "Exec-managerial", "Prof-specialty", "Handlers-cleaners", "Machine-op-inspct", "Adm-clerical",
+            "Farming-fishing", "Transport-moving", "Priv-house-serv", "Protective-serv", "Armed-Forces"},
+        {"Wife", "Own-child", "Husband", "Not-in-family", "Other-relative", "Unmarried"},
+        {"White", "Asian-Pac-Islander", "Amer-Indian-Eskimo", "Other", "Black"},
+        {"Female", "Male"},
+        {"0", "1"},
+        {"0", "1"},
+        {"0", "1"},
+        {"United-States", "Cambodia", "England", "Puerto-Rico", "Canada", "Germany", "Outlying-US(Guam-USVI-etc)", "India", "Japan", "Greece", "South", "China",
+            "Cuba", "Iran", "Honduras", "Philippines", "Italy", "Poland", "Jamaica", "Vietnam", "Mexico", "Portugal", "Ireland", "France", "Dominican-Republic", "Laos",
+            "Ecuador", "Taiwan", "Haiti", "Columbia", "Hungary", "Guatemala", "Nicaragua", "Scotland", "Thailand", "Yugoslavia", "El-Salvador", "Trinadad&Tobago",
+            "Peru", "Hong", "Holand-Netherlands"},
+        {"<=50K", ">50K"}
+    };
+
+    if (!test)
+    {
+        for (int i = 0; i < valNames.size() - 1; ++i)
+            attributes.insert(pair <int, int> (i, valNames[i].size()));
+        attributes.insert(pair <int, int> (valNames.size() - 1, -1));
+    }
+    //cout << "ATTRIBUTES" << endl;
+    //for (auto attribute: attributes)
+        //cout << attribute.first << " " << attribute.second << endl;
+
+    while(getline(fin, line))
+    {
+        stringstream linestream(line);
+        string value;
+        vector <int> record;
+        char space;
+        for (int att = 0; getline(linestream, value, ','); ++att)
+        {
+            switch(att)
+            {
+                case 0: case 2: case 4: //continuous data
+                case 10: case 11: case 12:
+                        int data;
+                        if(stringstream(value) >> data)
+                            record.push_back(data);
+                        else
+                            record.push_back(-1);
+                        break;
+                case 1: case 3: case 5: //discrete data
+                case 6: case 7: case 8:
+                case 9: case 13: case 14:
+                        auto iter = find(valNames[att].begin(), valNames[att].end(), value);
+                        if (iter != valNames[att].end())
+                            record.push_back(distance(valNames[att].begin(), iter));
+                        else
+                            record.push_back(-1);
+                        break;
+            }
+        }
+        data.push_back(record);
+    }
+    cout << "doing missing data" << endl << "    ";
+    fillMissingData(data, attributes);
+    cout << endl << "discretizing data" << endl;
+    discretizeData(0, data);
+    discretizeData(2, data);
+    discretizeData(4, data);
+    discretizeData(10, data);
+    discretizeData(11, data);
+    discretizeData(12, data);
+    cout << endl;
+    vector <int> attNums;
+    for (int i = 0; i < 15; ++i)
+        attNums.push_back(i);
+    data.insert(data.begin(), attNums);
+    /*for (int i = 0; i < data.size(); ++i)
+    {
+        cout << i << "-> ";
+        for (int j = 0; j < data[i].size(); ++j)
+            cout << data[i][j] << " ";
+        cout << endl;
+    }*/
+
+}
+
+void fillMissingData(vector <vector <int> > &data, set <pair <int, int> > &attributes)
+{
+    vector <vector <int> > countVal;
+    vector <int> countRec(attributes.size());
+    for (auto attribute: attributes)
+    {
+        if (attribute.first == attributes.size() - 1)
+            continue;
+        vector <int> countValAtt(attribute.second);
+        countVal.push_back(countValAtt);
+    }
+    //cout << "part 1 done" << data.size() << endl;
+    for (int i = 0; i < data.size(); ++i)
+    {
+        //if (i > 16280 && i < 16285)
+            //cout << i << ", " << data[i][0] << endl;
+
+        for (int j = 0; j < data[i].size() - 1; ++j)
+        {
+            //cout << data[i][j] << " ";
+            if (data[i][j] == -1)
+                continue;
+            switch(j)
+            {
+                case 0: case 2: case 4: //continuous data
+                case 10: case 11: case 12:
+                        countRec[j] += 1;
+                        countVal[j][0] += data[i][j]; //finds the average
+                        break;
+                case 1: case 3: case 5: //discrete data
+                case 6: case 7: case 8:
+                case 9: case 13: case 14:
+                        countVal[j][data[i][j]] += 1; //finds the mode
+                        break;
+            }
+        }
+        //cout << endl;
+    }
+    //cout << "part 2 done" << endl;
+    vector <int> bestVal;
+    for (int i = 0; i < attributes.size() - 1; ++i)
+    {
+        switch(i)
+        {
+            case 0: case 2: case 4: //continuous data
+            case 10: case 11: case 12:
+                    bestVal.push_back(countVal[i][0] / countRec[i]);
+                    break;
+            case 1: case 3: case 5: //discrete data
+            case 6: case 7: case 8:
+            case 9: case 13: case 14:
+                    int maxElement = 0, maxj = 0;
+                    for (int j = 0; j < countVal[i].size(); ++j)
+                        if (countVal[i][j] > maxElement)
+                        {
+                            maxElement = countVal[i][j];
+                            maxj = j;
+                        }
+
+                    bestVal.push_back(maxj);
+                    break;
+        }
+        cout << bestVal[i] << " ";
+    }
+    //cout << endl << "part 3 done" << endl;
+    for (int i = 0; i < data.size(); ++i)
+    {
+        for (int j = 0; j < data[i].size() - 1; ++j)
+        {
+            if (data[i][j] == -1)
+                data[i][j] = bestVal[j];
+        }
+    }
+    //cout << "part 4 done" << endl;
+}
+
+void discretizeData(int attNum, vector <vector <int> > &data)
+{
+    vector <vector <int> > tempData = data;
+    //cout << "starting the sort" << endl;
+    sort(tempData.begin(), tempData.end(),
+         [&attNum](const vector <int> &a, const vector <int> &b)
+         {
+             return a[attNum] < b[attNum];
+         });
+    //cout << "done " << attNum << endl;
+    int lastCol = tempData[0].size() - 1, cIndex;
+    int count0True = 0, count1True = 0, count0False = 0, count1False = 0;
+    for (int i = 0; i < tempData.size(); ++i)
+        count1True += tempData[i][lastCol];
+    count1False = tempData.size() - count1True;
+    count0True = tempData[0][lastCol];
+    count0False = 1 - tempData[0][lastCol];
+    double maxEntropy = INT_MAX, entropy;
+    for (int i = 1; i < tempData.size(); ++i)
+    {
+        if (tempData[i][lastCol] != tempData[i - 1][lastCol])
+        {
+            entropy = calcEntropy(count0True, count0False) + calcEntropy(count1True, count1False);
+            if (entropy < maxEntropy)
+            {
+                maxEntropy = entropy;
+                cIndex = i;
+            }
+        }
+        count0True += tempData[i][lastCol];
+        count0False += 1 - tempData[i][lastCol];
+        count1True -= tempData[i][lastCol];
+        count1False -= 1 - tempData[i][lastCol];
+    }
+    //cout << "out of loop!" << cIndex << endl;
+    double c = (double) ((double) tempData[cIndex][attNum] + tempData[cIndex - 1][attNum]) / 2;
+    cout << "    (att = " << attNum << ", c = " << c << ")" << endl;
+    for (int i = 0; i < data.size(); ++i)
+        data[i][attNum] = (data[i][attNum] <= c ? 0: 1);
 }
 
 node *ID3(vector <vector <int> > &data, set <pair <int, int> > &attributes)
 {
     node *check = checkSame(data);
     if (check != NULL)
+    {
+        //done += data.size();
+        //cout << done << " " << done / dataSize << endl;
         return check;
-    if (attributes.empty())
+    }
+    if (attributes.size() == 1)
+    {
+        //done += data.size();
+        //cout << done / dataSize << endl;
         return doVoting(data);
+    }
+
     //now the not so trivial part
 
     //declarations
-    double splitEntropy = 10000, entropy;
+    double maxEntropy = INT_MAX, entropy;
     node *root = new node();
     pair <int, int> bestAtt;
     set <pair <int, int> > newAttributes = attributes; //for: attributes - {bestAtt}
 
     //calculating the optimal attribute to make a root
+    //cout << "hello" << endl;
     for (auto attribute: attributes)
     {
+        //cout << "Now checking entropy of att" << attribute.first << endl;
         entropy = calcEntropyGain(data, attribute); //returns the entropy
-        if (entropy < splitEntropy)
+        //cout << "yo i'm back" << endl;
+        if (entropy < maxEntropy)
         {
-            splitEntropy = entropy;
+            maxEntropy = entropy;
             bestAtt = attribute;
         }
+        //cout << "finished checking entropy of att" << attribute.first << endl;
     }
     root->attribute = bestAtt;
-    cout << "bestAtt found! " << bestAtt.first << ", Entropy " << splitEntropy << endl;
+    //cout << "bestAtt found! " << bestAtt.first << ", Entropy " << maxEntropy << endl;
 
     //now to make its children
-    newAttributes.erase(bestAtt);
+    for (auto it = newAttributes.begin(); it != newAttributes.end(); ++it)
+    {
+        if (it->first == bestAtt.first)
+            newAttributes.erase(it);
+    }
+
     for (int val = 0; val < bestAtt.second; ++val) //iterating through all the possible values of the attribute
     {
         vector <vector <int> > vdata;
         cutData(data, bestAtt.first, val, vdata);
-        cout << "__________DATA(" << bestAtt.first << "=" << val << "_________" << endl;
-        printData(vdata);
+        //cout << "__________DATA(" << bestAtt.first << "=" << val << "_________" << endl;
+        //printData(vdata);
         if (vdata.size() <= 1)
             root->nextAtt.push_back(doVoting(data));
         else //recursive call
@@ -142,12 +412,13 @@ double calcEntropy(int countTrue, int countFalse)
 
 double calcEntropyGain(vector <vector <int> > &data, pair <int, int> &attribute)
 {
-    if (attribute.second == -1) return 10000;
-    vector <pair <int, int> > table(attribute.second); //first int is true, second is false
+    if (attribute.second == -1) return INT_MAX;
+    vector <pair <int, int> > table(attribute.second); //first int is countTrue, second is countFalse
     int lastCol = data[0].size() - 1, attCol;
     for (attCol = 0; attCol < lastCol; ++attCol)
         if (data[0][attCol] == attribute.first)
             break;
+    //cout << "attribute column number = " << attCol << endl;
     for (int recordNum = 1; recordNum < data.size(); ++recordNum)
     {
         if (data[recordNum][lastCol] == 1)
@@ -156,16 +427,18 @@ double calcEntropyGain(vector <vector <int> > &data, pair <int, int> &attribute)
             table[data[recordNum][attCol]].second += 1;
     }
     double sum = 0;
-    cout << "****************Table (att" << attribute.first << ")**************" << endl;
+    /*cout << "****************Table (att" << attribute.first << ")**************" << endl;
     for (int val = 0; val < attribute.second; ++val)
     {
         cout << "val" << val << "-> true: " << table[val].first << ", false: " << table[val].second;
         cout << ", entropy: " << calcEntropy(table[val].first, table[val].second) << endl;
     }
-
-    cout << endl;
+    cout << "*************FINI**************" << endl;
+    cout << endl;*/
     for (int val = 0; val < attribute.second; ++val)
         sum += calcEntropy(table[val].first, table[val].second);
+    //cout << "returning from function..." << endl;
+    //cout << "2 + 2 = " << sum << endl;
     return sum;
 }
 
@@ -173,7 +446,7 @@ void cutData(vector <vector <int> > &data, int attNum, int val, vector <vector <
 {
     int attCol;
     vector <int> attNums;
-    for (attCol = 0; attCol < data[0].size(); ++attCol)
+    for (attCol = 0; attCol < data[0].size() - 1; ++attCol)
         if (attNum == data[0][attCol])
             break;
     for (int col = 0; col < data[0].size(); ++col)
@@ -197,6 +470,7 @@ void cutData(vector <vector <int> > &data, int attNum, int val, vector <vector <
 
 void printTree(node* root, int tabs)
 {
+    if (tabs > 2) return;
     for (int tab = 0; tab < tabs; ++tab)
         cout << "  ";
     cout << root->attribute.first << endl;
@@ -215,5 +489,3 @@ void printData(vector <vector <int> > x)
         cout << endl;
     }
 }
-
-
