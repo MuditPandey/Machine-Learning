@@ -1,11 +1,14 @@
 #include <fstream>
 #include <sstream>
 #include <iostream>
+#include <math.h>
 #include <set>
 #include <algorithm>
 #include <vector>
-#include <type_traits>
+#include <time.h>
+#include <stdlib.h>
 #include <limits.h>
+#define FOREST_SIZE 101
 
 using namespace std;
 
@@ -19,7 +22,7 @@ double done = 0;
 double dataSize;
 
 void loadData(vector <vector <int> > &data, set <pair <int, int> > &attributes, bool test = false); //for fixing continuous data and ? and marking all attributes from 0 to n -> load the data
-node *ID3(vector <vector <int> > &data, set <pair <int, int> > &attributes);
+node *ID3(vector <vector <int> > &data, set <pair <int, int> > &attributes,bool random_forest=false);
 node *checkSame(vector <vector <int> > &data); //returns valTrue/valFalse if all the data have the same val, otherwise returns NULL
 node *doVoting(vector <vector <int> > &data); //returns valTrue/valFalse based on voting
 double calcEntropyGain(vector <vector <int> > &data, pair <int, int> &attribute);
@@ -29,7 +32,10 @@ void printTree(node*, int tabs = 0);
 void printData(vector <vector <int> >);
 void discretizeData(int attNum, vector <vector <int> > &data);
 void fillMissingData(vector <vector <int> > &data, set <pair <int, int> > &attributes);
-double testData(vector <vector <int> > &testData, node *root);
+double testData(vector <vector <int> > &testData, vector <node*> root);
+vector<vector<int> > get_new_data(vector<vector<int> > &data);
+set<pair<int,int> > get_new_attributes(set< pair<int,int> > &att);
+
 
 void space_modifier()
 {
@@ -74,16 +80,106 @@ int main()
     cout << "preprocessing given data" << endl;
     loadData(data, attributes);
     dataSize = data.size();
-    cout << "running ID3" << endl;
-    node *root = ID3(data, attributes);
-    //printTree(root);
-    cout << "preprocessing test data" << endl;
-    loadData(dataTest, attributes, true);
-    cout << "testing data with decision tree" << endl;
-    cout << "Accuracy is: " << testData(dataTest, root);
-}
+    int ch;
+    bool again=false;
 
-double testData(vector <vector <int> > &dataTest, node *root)
+    do{
+        cout<<"1.ID3\n2.ID3 with pruning\n3.ID3 with random forest\nChoice? ";
+        cin>>ch;
+            vector <node *> rootTree;
+        //node* root;
+        switch(ch)
+        {
+            case 1:again=false;
+            cout << "running ID3" << endl;
+            node *root;
+            root=ID3(data, attributes);
+            cout << "preprocessing test data" << endl;
+            loadData(dataTest, attributes, true);
+            cout << "testing data with decision tree" << endl;
+            rootTree.push_back(root);
+            cout << "Accuracy is: " << testData(dataTest, rootTree) << endl;
+            break;
+            case 2:
+            again=false;
+            cout << "running ID3 with pruning" << endl;
+            //
+            // FILL THIS
+            //
+            cout << "preprocessing test data" << endl;
+            loadData(dataTest, attributes, true);
+            cout << "testing data with decision tree" << endl;
+            //cout << "Accuracy is: " << testData(dataTest, root);
+            break;
+            case 3:again=false;
+            cout << "running ID3 with random forest" << endl;
+            for(int i=0;i<FOREST_SIZE;i++)
+            {
+                cout<<"Making TREE:"<<i<<endl;
+                vector< vector<int> > sampled_data=get_new_data(data);
+                //cout<<"Data size:"<<sampled_data.size()<<endl;
+                rootTree.push_back(ID3(sampled_data, attributes,true));
+            }
+            cout << "preprocessing test data" << endl;
+            loadData(dataTest, attributes, true);
+            cout << "testing data with random forest" << endl;
+            cout << "Accuracy is: " << testData(dataTest, rootTree) << endl;
+            break;
+            default:
+            cout<<"Invalid Choice!\n";
+            again=true;
+        }
+    }while(again);
+    //printTree(root);
+
+}
+set<pair<int,int> > get_new_attributes(set< pair<int,int> > &att)
+{
+    vector<pair<int,int> > temp;
+    set<pair<int,int> > ret;
+    //cout << "attribute size: " << att.size() << endl;
+    for(set<pair<int,int> >::iterator it=att.begin();it!=att.end();it++)
+    {
+        if (it->second == -1)
+            continue;
+        //cout << "adding " << it->first;
+        pair<int,int> add;
+        add.first=it->first;
+        add.second=it->second;
+        temp.push_back(add);
+    }
+    srand(time(NULL));
+    int sizes=0;
+    //cout << "checkpoint " << endl;
+    while(sizes!=(int)sqrt(att.size() - 1))
+    {
+        int index=rand()%temp.size();
+        ret.insert(temp[index]);
+        temp.erase(temp.begin()+index);
+        sizes++;
+    }
+    //cout<<"New att:\n";
+    //for(set<pair<int,int> >::iterator it=ret.begin();it!=ret.end();it++)
+    //{
+    //    cout<<it->first<<" " <<it->second<<endl;
+    //}
+    //cout << "returning..." << endl;
+    return ret;
+}
+vector<vector<int> > get_new_data(vector<vector<int> > &data)
+{
+    vector< vector<int> > ret;
+    srand(time(NULL));
+    for(int i=0;i<data.size();i++)
+    {
+        int index=rand()%(data.size() - 1) + 1;
+        //cout<<"index="<<index<<endl;
+        ret.push_back(data[index]);
+    }
+    ret.insert(ret.begin(), data[0]);
+    return ret;
+}
+double testData(vector <vector <int> > &dataTest, vector <node *> rootTree)
 {
     int passed = 0, lastCol = dataTest[0].size() - 1;
     for (int i = 1; i < dataTest.size(); ++i)
@@ -91,17 +187,23 @@ double testData(vector <vector <int> > &dataTest, node *root)
         //for (int j = 0; j <= lastCol; ++j)
             //cout << dataTest[i][j] << " ";
         //cout << endl;
-        node *traverse = root;
-        while (traverse->attribute.first >= 0)
+        int vote = 0;
+        for (auto root: rootTree)
         {
+            node *traverse = root;
+            while (traverse->attribute.first >= 0)
+            {
+                //cout << endl;
+                //cout << "attribute: " << traverse->attribute.first << endl;
+                //cout << "nextAtt array size: " << traverse->nextAtt.size() << endl;
+                //cout << "data[i][j]: " << dataTest[i][traverse->attribute.first] << endl;
+                traverse = traverse->nextAtt[dataTest[i][traverse->attribute.first]];
+            }
             //cout << endl;
-            //cout << "attribute: " << traverse->attribute.first << endl;
-            //cout << "nextAtt array size: " << traverse->nextAtt.size() << endl;
-            //cout << "data[i][j]: " << dataTest[i][traverse->attribute.first] << endl;
-            traverse = traverse->nextAtt[dataTest[i][traverse->attribute.first]];
+            if (traverse->attribute.first + 2 == dataTest[i][lastCol])
+                ++vote;
         }
-        //cout << endl;
-        if (traverse->attribute.first + 2 == dataTest[i][lastCol])
+        if (2 * vote > (int)rootTree.size())
             ++passed;
     }
     return (double)passed / (dataTest.size() - 1);
@@ -319,7 +421,7 @@ void discretizeData(int attNum, vector <vector <int> > &data)
         data[i][attNum] = (data[i][attNum] <= c ? 0: 1);
 }
 
-node *ID3(vector <vector <int> > &data, set <pair <int, int> > &attributes)
+node *ID3(vector <vector <int> > &data, set <pair <int, int> > &attributes,bool random_forest)
 {
     node *check = checkSame(data);
     if (check != NULL)
@@ -341,15 +443,25 @@ node *ID3(vector <vector <int> > &data, set <pair <int, int> > &attributes)
     double maxEntropy = INT_MAX, entropy;
     node *root = new node();
     pair <int, int> bestAtt;
-    set <pair <int, int> > newAttributes = attributes; //for: attributes - {bestAtt}
+    set <pair <int, int> > newAttributes = attributes;
+    set <pair <int, int> > copyAttributes;
+     //for: attributes - {bestAtt}
 
     //calculating the optimal attribute to make a root
     //cout << "hello" << endl;
-    for (auto attribute: attributes)
+    if(random_forest)
+    {
+        copyAttributes = get_new_attributes(attributes);
+        //cout<<"bacK!"<<copyAttributes.size()<<"\n";
+    }
+    else
+        copyAttributes=attributes;
+
+    for (auto attribute: copyAttributes)
     {
         //cout << "Now checking entropy of att" << attribute.first << endl;
         entropy = calcEntropyGain(data, attribute); //returns the entropy
-        //cout << "yo i'm back" << endl;
+        //cout << "yo i'm back with: " << entropy << endl;
         if (entropy < maxEntropy)
         {
             maxEntropy = entropy;
@@ -376,7 +488,7 @@ node *ID3(vector <vector <int> > &data, set <pair <int, int> > &attributes)
         if (vdata.size() <= 1)
             root->nextAtt.push_back(doVoting(data));
         else //recursive call
-            root->nextAtt.push_back(ID3(vdata, newAttributes));
+            root->nextAtt.push_back(ID3(vdata, newAttributes,random_forest));
     }
     return root;
 }
