@@ -35,8 +35,8 @@ void fillMissingData(vector <vector <int> > &data, set <pair <int, int> > &attri
 double testData(vector <vector <int> > &testData, vector <node*> root);
 vector<vector<int> > get_new_data(vector<vector<int> > &data);
 set<pair<int,int> > get_new_attributes(set< pair<int,int> > &att);
-
-
+vector<vector<int> > get_validation_set(vector<vector<int> > &,bool random=false);
+void reduced_error_pruning(node *);
 void space_modifier()
 {
     ifstream fin;
@@ -87,6 +87,7 @@ int main()
         cout<<"1.ID3\n2.ID3 with pruning\n3.ID3 with random forest\nChoice? ";
         cin>>ch;
             vector <node *> rootTree;
+            vector<vector<int> > validation;
         //node* root;
         switch(ch)
         {
@@ -103,12 +104,25 @@ int main()
             case 2:
             again=false;
             cout << "running ID3 with pruning" << endl;
-            //
-            // FILL THIS
-            //
+            validation=get_validation_set(data);
+            //cout<<"Created validation set!\n";
+            //build normal tree using modified grow set
+            cout<<"Data size:"<<data.size()<<endl;
+            root=ID3(data, attributes);
+            cout<<"Tree constructed!\n";
             cout << "preprocessing test data" << endl;
             loadData(dataTest, attributes, true);
             cout << "testing data with decision tree" << endl;
+            rootTree.push_back(root);
+            double acc=testData(dataTest, rootTree);
+            cout << "Accuracy is: " << acc<< endl;
+            reduced_error_pruning(root,acc);
+            //
+            // FILL THIS
+            //
+           // cout << "preprocessing test data" << endl;
+           // loadData(dataTest, attributes, true);
+            //cout << "testing data with decision tree" << endl;
             //cout << "Accuracy is: " << testData(dataTest, root);
             break;
             case 3:again=false;
@@ -132,6 +146,16 @@ int main()
     }while(again);
     //printTree(root);
 
+}
+
+void reduced_error_pruning(node *root,double acc)
+{
+  double prev_acc=acc;
+  double curr_acc=acc;
+  while(cur_acc>=prev_acc)
+  {
+
+  }
 }
 set<pair<int,int> > get_new_attributes(set< pair<int,int> > &att)
 {
@@ -303,7 +327,37 @@ void loadData(vector <vector <int> > &data, set <pair <int, int> > &attributes, 
     }*/
 
 }
+vector<vector<int> > get_validation_set(vector<vector<int> > &data,bool random)
+{
+    float val_size_ratio=0.3;
+    vector<vector<int> > ret;
+    if(!random)
+    {
+        int grow_size=(1-val_size_ratio)*data.size();
+        cout<<"Grow size "<<grow_size<<endl;
+        for(int i=grow_size;i<data.size();i++)
+        {
+            ret.push_back(data[i]);
+            data.erase(data.begin()+i);
+            i--;
+        }
+    }
+    //Random Validation Set
+    else
+    {
+       int val_size=val_size_ratio*data.size()+1;
+       srand(time(NULL));
+       for(int i=0;i<val_size;i++)
+        {
+            int index=rand()%data.size();
+            ret.push_back(data[index]);
+            data.erase(data.begin()+index);
+        }
+    }
 
+    cout<<"Validation set created!\n";
+    return ret;
+}
 void fillMissingData(vector <vector <int> > &data, set <pair <int, int> > &attributes)
 {
     vector <vector <int> > countVal;
