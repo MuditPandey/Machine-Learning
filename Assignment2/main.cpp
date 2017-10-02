@@ -7,8 +7,10 @@
 #include <vector>
 #include <time.h>
 #include <stdlib.h>
+#include <time.h>
 #include <limits.h>
-#define FOREST_SIZE 101
+#define FOREST_SIZE 5
+#define VALRATIO 0.3
 
 using namespace std;
 
@@ -16,10 +18,8 @@ struct node
 {
     pair <int, int> attribute; //attribute #, and number of values
     vector <node*> nextAtt;
+    bool guess;
 } valTrue, valFalse;
-
-double done = 0;
-double dataSize;
 
 void loadData(vector <vector <int> > &data, set <pair <int, int> > &attributes, bool test = false); //for fixing continuous data and ? and marking all attributes from 0 to n -> load the data
 node *ID3(vector <vector <int> > &data, set <pair <int, int> > &attributes,bool random_forest=false);
@@ -29,14 +29,16 @@ double calcEntropyGain(vector <vector <int> > &data, pair <int, int> &attribute)
 double calcEntropy(int, int);
 void cutData(vector <vector <int> > &data, int, int, vector <vector <int> > &vdata); //also removes the attribute maxAtt from data
 void printTree(node*, int tabs = 0);
-void printData(vector <vector <int> >);
+void printData(vector <vector <int> > &);
 void discretizeData(int attNum, vector <vector <int> > &data);
 void fillMissingData(vector <vector <int> > &data, set <pair <int, int> > &attributes);
-double testData(vector <vector <int> > &testData, vector <node*> root);
-vector<vector<int> > get_new_data(vector<vector<int> > &data);
+double testData(vector <vector <int> > &testData, vector <node*> root, bool printDetails = false);
+void get_new_data(vector<vector<int> > &data, vector<vector <int> > &sampleData);
 set<pair<int,int> > get_new_attributes(set< pair<int,int> > &att);
-vector<vector<int> > get_validation_set(vector<vector<int> > &,bool random=false);
-void reduced_error_pruning(node *);
+void get_validation_set(vector<vector<int> > &data, vector <vector <int> > &validationData);
+double reduced_error_pruning(vector <vector <int> > &vdata, node *, node *, double acc);
+int treeSize(node *root);
+
 void space_modifier()
 {
     ifstream fin;
@@ -79,94 +81,131 @@ int main()
     set <pair <int, int> > attributes; //first int is the attribute number and the second is the number of values of the attribute
     cout << "preprocessing given data" << endl;
     loadData(data, attributes);
-    dataSize = data.size();
     int ch;
-    bool again=false;
+    bool again = false;
+    double acc;
 
     do{
-        cout<<"1.ID3\n2.ID3 with pruning\n3.ID3 with random forest\nChoice? ";
-        cin>>ch;
-            vector <node *> rootTree;
-            vector<vector<int> > validation;
-        //node* root;
+        cout << "1.ID3\n2.ID3 with pruning\n3.ID3 with random forest\nChoice? ";
+        cin >> ch;
+        cout << endl;
+        vector <node *> rootTree;
+        vector<vector<int> > validationData;
+        node* root;
+        time_t t;
+        double time_taken;
         switch(ch)
         {
-            case 1:again=false;
-            cout << "running ID3" << endl;
-            node *root;
-            root=ID3(data, attributes);
-            cout << "preprocessing test data" << endl;
-            loadData(dataTest, attributes, true);
-            cout << "testing data with decision tree" << endl;
-            rootTree.push_back(root);
-            cout << "Accuracy is: " << testData(dataTest, rootTree) << endl;
-            break;
-            case 2:
-            again=false;
-            cout << "running ID3 with pruning" << endl;
-            validation=get_validation_set(data);
-            //cout<<"Created validation set!\n";
-            //build normal tree using modified grow set
-            cout<<"Data size:"<<data.size()<<endl;
-            root=ID3(data, attributes);
-            cout<<"Tree constructed!\n";
-            cout << "preprocessing test data" << endl;
-            loadData(dataTest, attributes, true);
-            cout << "testing data with decision tree" << endl;
-            rootTree.push_back(root);
-            double acc=testData(dataTest, rootTree);
-            cout << "Accuracy is: " << acc<< endl;
-            reduced_error_pruning(root,acc);
-            //
-            // FILL THIS
-            //
-           // cout << "preprocessing test data" << endl;
-           // loadData(dataTest, attributes, true);
-            //cout << "testing data with decision tree" << endl;
-            //cout << "Accuracy is: " << testData(dataTest, root);
-            break;
-            case 3:again=false;
-            cout << "running ID3 with random forest" << endl;
-            for(int i=0;i<FOREST_SIZE;i++)
-            {
-                cout<<"Making TREE:"<<i<<endl;
-                vector< vector<int> > sampled_data=get_new_data(data);
-                //cout<<"Data size:"<<sampled_data.size()<<endl;
-                rootTree.push_back(ID3(sampled_data, attributes,true));
-            }
-            cout << "preprocessing test data" << endl;
-            loadData(dataTest, attributes, true);
-            cout << "testing data with random forest" << endl;
-            cout << "Accuracy is: " << testData(dataTest, rootTree) << endl;
-            break;
+            case 1: again = false;
+                    cout << "running ID3" << endl;
+                    t = clock();
+                    root = ID3(data, attributes);
+                    time_taken=((double)clock()-t)/CLOCKS_PER_SEC;
+                    cout << "    Time taken for training:" << time_taken << endl;
+                    cout << "preprocessing test data" << endl;
+                    loadData(dataTest, attributes, true);
+                    cout << "testing data with decision tree" << endl;
+                    rootTree.push_back(root);
+                    testData(dataTest, rootTree, true);
+                    break;
+
+            case 2: again = false;
+                    cout << "Partitioning validation set" << endl;
+                    get_validation_set(data, validationData);
+                    //build normal tree using modified grow set
+                    cout << "Running ID3" << endl;
+                    root = ID3(data, attributes);
+                    cout << "    Tree size: " << treeSize(root) << endl;
+                    cout << "preprocessing test data" << endl;
+                    loadData(dataTest, attributes, true);
+                    cout << "testing data with decision tree" << endl;
+                    rootTree.push_back(root);
+                    cout << "    Before pruning: " << endl;
+                    testData(dataTest, rootTree, true);
+                    cout << "Pruning tree for optimum accuracy" << endl;
+                    t = clock();
+                    cout << "    Optimized Accuracy on validation set: " << reduced_error_pruning(validationData, root, root,acc) << endl;
+                    time_taken=((double)clock()-t)/CLOCKS_PER_SEC;
+                    cout << "    Total Time taken for training: " << time_taken << endl;
+                    rootTree.clear();
+                    rootTree.push_back(root);
+                    cout << "    Accuracy on test data: " << testData(dataTest, rootTree, true) << endl;
+                    cout << "    Tree size: " << treeSize(root) << endl;
+                    break;
+            case 3:
+                    again = false;
+                    cout << "running ID3 with random forest" << endl;
+                    t = clock();
+                    for(int i=0;i<FOREST_SIZE;i++)
+                    {
+                        cout<<"    Making TREE:"<<i<<endl;
+                        vector< vector<int> > sampled_data;
+                        get_new_data(data, sampled_data);
+                        rootTree.push_back(ID3(sampled_data, attributes,true));
+                    }
+                    time_taken=((double)clock()-t)/CLOCKS_PER_SEC;
+                    cout<<"Time taken for training:"<<time_taken<<endl;
+                    cout << "preprocessing test data" << endl;
+                    loadData(dataTest, attributes, true);
+                    cout << "testing data with random forest" << endl;
+                    cout << "Results on test data: " << endl;
+                    testData(dataTest, rootTree, true);
+                    break;
             default:
-            cout<<"Invalid Choice!\n";
-            again=true;
+                    cout<<"Invalid Choice!\n";
+                    again=true;
         }
     }while(again);
-    //printTree(root);
 
 }
 
-void reduced_error_pruning(node *root,double acc)
+int treeSize(node *root)
 {
-  double prev_acc=acc;
-  double curr_acc=acc;
-  while(cur_acc>=prev_acc)
-  {
-
-  }
+    int sum = 0;
+    for (auto child: root->nextAtt)
+    {
+        if (child == &valTrue || child == &valFalse)
+            continue;
+        sum += treeSize(child);
+    }
+    return sum + 1;
 }
+
+double reduced_error_pruning(vector <vector <int> > &vdata, node *root, node *n, double maxAcc)
+{
+    for (int child = 0; child < n->nextAtt.size(); ++child)
+    {
+        if (n->nextAtt[child] == &valTrue || n->nextAtt[child] == &valFalse)
+            continue;
+        double newAcc = reduced_error_pruning(vdata, root, n->nextAtt[child], maxAcc);
+        if (newAcc > maxAcc)
+            maxAcc = newAcc;
+    }
+    vector <node *> childBuffer;
+    move(n->nextAtt.begin(), n->nextAtt.end(), back_inserter(childBuffer));
+    n->nextAtt.resize(1);
+    n->nextAtt[0] = n->guess? &valTrue: &valFalse;
+
+    vector <node *> rootForest;
+    rootForest.push_back(root);
+    double currAcc = testData(vdata, rootForest);
+
+    if (currAcc > maxAcc)
+        return currAcc;
+
+    n->nextAtt.clear();
+    move(childBuffer.begin(), childBuffer.end(), back_inserter(n->nextAtt));
+    return maxAcc;
+}
+
 set<pair<int,int> > get_new_attributes(set< pair<int,int> > &att)
 {
     vector<pair<int,int> > temp;
     set<pair<int,int> > ret;
-    //cout << "attribute size: " << att.size() << endl;
     for(set<pair<int,int> >::iterator it=att.begin();it!=att.end();it++)
     {
         if (it->second == -1)
             continue;
-        //cout << "adding " << it->first;
         pair<int,int> add;
         add.first=it->first;
         add.second=it->second;
@@ -174,7 +213,6 @@ set<pair<int,int> > get_new_attributes(set< pair<int,int> > &att)
     }
     srand(time(NULL));
     int sizes=0;
-    //cout << "checkpoint " << endl;
     while(sizes!=(int)sqrt(att.size() - 1))
     {
         int index=rand()%temp.size();
@@ -182,55 +220,56 @@ set<pair<int,int> > get_new_attributes(set< pair<int,int> > &att)
         temp.erase(temp.begin()+index);
         sizes++;
     }
-    //cout<<"New att:\n";
-    //for(set<pair<int,int> >::iterator it=ret.begin();it!=ret.end();it++)
-    //{
-    //    cout<<it->first<<" " <<it->second<<endl;
-    //}
-    //cout << "returning..." << endl;
     return ret;
 }
-vector<vector<int> > get_new_data(vector<vector<int> > &data)
+
+void get_new_data(vector<vector<int> > &data, vector <vector <int> > &ret)
 {
-    vector< vector<int> > ret;
     srand(time(NULL));
     for(int i=0;i<data.size();i++)
     {
         int index=rand()%(data.size() - 1) + 1;
-        //cout<<"index="<<index<<endl;
         ret.push_back(data[index]);
     }
     ret.insert(ret.begin(), data[0]);
-    return ret;
 }
-double testData(vector <vector <int> > &dataTest, vector <node *> rootTree)
+
+double testData(vector <vector <int> > &dataTest, vector <node *> rootTree, bool printDetails)
 {
-    int passed = 0, lastCol = dataTest[0].size() - 1;
+    int tp = 0, fn = 0, fp = 0, tn = 0, lastCol = dataTest[0].size() - 1;
     for (int i = 1; i < dataTest.size(); ++i)
     {
-        //for (int j = 0; j <= lastCol; ++j)
-            //cout << dataTest[i][j] << " ";
-        //cout << endl;
         int vote = 0;
         for (auto root: rootTree)
         {
             node *traverse = root;
             while (traverse->attribute.first >= 0)
-            {
-                //cout << endl;
-                //cout << "attribute: " << traverse->attribute.first << endl;
-                //cout << "nextAtt array size: " << traverse->nextAtt.size() << endl;
-                //cout << "data[i][j]: " << dataTest[i][traverse->attribute.first] << endl;
                 traverse = traverse->nextAtt[dataTest[i][traverse->attribute.first]];
-            }
-            //cout << endl;
-            if (traverse->attribute.first + 2 == dataTest[i][lastCol])
-                ++vote;
+
+            vote += 2*traverse->attribute.first + 3;
         }
-        if (2 * vote > (int)rootTree.size())
-            ++passed;
+        if (vote > 0 && dataTest[i][lastCol] == 1)
+            ++tp;
+        else if (vote < 0 && dataTest[i][lastCol] == 0)
+            ++tn;
+        else if (vote > 0 && dataTest[i][lastCol] == 0)
+            ++fp;
+        else
+            ++fn;
     }
-    return (double)passed / (dataTest.size() - 1);
+    if (printDetails)
+    {
+        int dataSize = dataTest.size() - 1;
+        double accuracy = (double)(tp + tn) / dataSize;
+        double precision = (double)tp / (tp + fp);
+        double recall = (double)tp / (tp + fn);
+        double fmeausre = 2 * precision * recall / (precision + recall);
+        cout << "        Accuracy: " << accuracy << endl;
+        cout << "        Precision: " << precision << endl;
+        cout << "        Recall: " << recall << endl;
+        cout << "        F-Measure: " << fmeausre << endl;
+    }
+    return (double)(tp + tn) / (dataTest.size() - 1);
 }
 
 void loadData(vector <vector <int> > &data, set <pair <int, int> > &attributes, bool test)
@@ -269,9 +308,6 @@ void loadData(vector <vector <int> > &data, set <pair <int, int> > &attributes, 
             attributes.insert(pair <int, int> (i, valNames[i].size()));
         attributes.insert(pair <int, int> (valNames.size() - 1, -1));
     }
-    //cout << "ATTRIBUTES" << endl;
-    //for (auto attribute: attributes)
-        //cout << attribute.first << " " << attribute.second << endl;
 
     while(getline(fin, line))
     {
@@ -318,46 +354,15 @@ void loadData(vector <vector <int> > &data, set <pair <int, int> > &attributes, 
     for (int i = 0; i < 15; ++i)
         attNums.push_back(i);
     data.insert(data.begin(), attNums);
-    /*for (int i = 0; i < data.size(); ++i)
-    {
-        cout << i << "-> ";
-        for (int j = 0; j < data[i].size(); ++j)
-            cout << data[i][j] << " ";
-        cout << endl;
-    }*/
-
 }
-vector<vector<int> > get_validation_set(vector<vector<int> > &data,bool random)
+
+void get_validation_set(vector<vector<int> > &data, vector <vector <int> > &vdata)
 {
-    float val_size_ratio=0.3;
-    vector<vector<int> > ret;
-    if(!random)
-    {
-        int grow_size=(1-val_size_ratio)*data.size();
-        cout<<"Grow size "<<grow_size<<endl;
-        for(int i=grow_size;i<data.size();i++)
-        {
-            ret.push_back(data[i]);
-            data.erase(data.begin()+i);
-            i--;
-        }
-    }
-    //Random Validation Set
-    else
-    {
-       int val_size=val_size_ratio*data.size()+1;
-       srand(time(NULL));
-       for(int i=0;i<val_size;i++)
-        {
-            int index=rand()%data.size();
-            ret.push_back(data[index]);
-            data.erase(data.begin()+index);
-        }
-    }
-
-    cout<<"Validation set created!\n";
-    return ret;
+    float valSize = VALRATIO * data.size();
+    move(data.begin() + (data.size() - valSize), data.end(), back_inserter(vdata));
+    data.resize(data.size() - valSize);
 }
+
 void fillMissingData(vector <vector <int> > &data, set <pair <int, int> > &attributes)
 {
     vector <vector <int> > countVal;
@@ -369,15 +374,10 @@ void fillMissingData(vector <vector <int> > &data, set <pair <int, int> > &attri
         vector <int> countValAtt(attribute.second);
         countVal.push_back(countValAtt);
     }
-    //cout << "part 1 done" << data.size() << endl;
     for (int i = 0; i < data.size(); ++i)
     {
-        //if (i > 16280 && i < 16285)
-            //cout << i << ", " << data[i][0] << endl;
-
         for (int j = 0; j < data[i].size() - 1; ++j)
         {
-            //cout << data[i][j] << " ";
             if (data[i][j] == -1)
                 continue;
             switch(j)
@@ -394,9 +394,7 @@ void fillMissingData(vector <vector <int> > &data, set <pair <int, int> > &attri
                         break;
             }
         }
-        //cout << endl;
     }
-    //cout << "part 2 done" << endl;
     vector <int> bestVal;
     for (int i = 0; i < attributes.size() - 1; ++i)
     {
@@ -422,7 +420,6 @@ void fillMissingData(vector <vector <int> > &data, set <pair <int, int> > &attri
         }
         cout << bestVal[i] << " ";
     }
-    //cout << endl << "part 3 done" << endl;
     for (int i = 0; i < data.size(); ++i)
     {
         for (int j = 0; j < data[i].size() - 1; ++j)
@@ -431,19 +428,16 @@ void fillMissingData(vector <vector <int> > &data, set <pair <int, int> > &attri
                 data[i][j] = bestVal[j];
         }
     }
-    //cout << "part 4 done" << endl;
 }
 
 void discretizeData(int attNum, vector <vector <int> > &data)
 {
     vector <vector <int> > tempData = data;
-    //cout << "starting the sort" << endl;
     sort(tempData.begin(), tempData.end(),
          [&attNum](const vector <int> &a, const vector <int> &b)
          {
              return a[attNum] < b[attNum];
          });
-    //cout << "done " << attNum << endl;
     int lastCol = tempData[0].size() - 1, cIndex;
     int count0True = 0, count1True = 0, count0False = 0, count1False = 0;
     for (int i = 0; i < tempData.size(); ++i)
@@ -468,63 +462,46 @@ void discretizeData(int attNum, vector <vector <int> > &data)
         count1True -= tempData[i][lastCol];
         count1False -= 1 - tempData[i][lastCol];
     }
-    //cout << "out of loop!" << cIndex << endl;
     double c = (double) ((double) tempData[cIndex][attNum] + tempData[cIndex - 1][attNum]) / 2;
     cout << "    (att = " << attNum << ", c = " << c << ")" << endl;
     for (int i = 0; i < data.size(); ++i)
         data[i][attNum] = (data[i][attNum] <= c ? 0: 1);
 }
 
-node *ID3(vector <vector <int> > &data, set <pair <int, int> > &attributes,bool random_forest)
+node *ID3(vector <vector <int> > &data, set <pair <int, int> > &attributes, bool random_forest)
 {
     node *check = checkSame(data);
     if (check != NULL)
-    {
-        //done += data.size();
-        //cout << done << " " << done / dataSize << endl;
         return check;
-    }
     if (attributes.size() == 1)
-    {
-        //done += data.size();
-        //cout << done / dataSize << endl;
         return doVoting(data);
-    }
 
     //now the not so trivial part
 
     //declarations
     double maxEntropy = INT_MAX, entropy;
     node *root = new node();
+    root->guess = (doVoting(data) == &valTrue? true: false);
     pair <int, int> bestAtt;
     set <pair <int, int> > newAttributes = attributes;
     set <pair <int, int> > copyAttributes;
-     //for: attributes - {bestAtt}
 
     //calculating the optimal attribute to make a root
-    //cout << "hello" << endl;
-    if(random_forest)
-    {
+    if (random_forest)
         copyAttributes = get_new_attributes(attributes);
-        //cout<<"bacK!"<<copyAttributes.size()<<"\n";
-    }
     else
         copyAttributes=attributes;
 
     for (auto attribute: copyAttributes)
     {
-        //cout << "Now checking entropy of att" << attribute.first << endl;
         entropy = calcEntropyGain(data, attribute); //returns the entropy
-        //cout << "yo i'm back with: " << entropy << endl;
         if (entropy < maxEntropy)
         {
             maxEntropy = entropy;
             bestAtt = attribute;
         }
-        //cout << "finished checking entropy of att" << attribute.first << endl;
     }
     root->attribute = bestAtt;
-    //cout << "bestAtt found! " << bestAtt.first << ", Entropy " << maxEntropy << endl;
 
     //now to make its children
     for (auto it = newAttributes.begin(); it != newAttributes.end(); ++it)
@@ -537,8 +514,6 @@ node *ID3(vector <vector <int> > &data, set <pair <int, int> > &attributes,bool 
     {
         vector <vector <int> > vdata;
         cutData(data, bestAtt.first, val, vdata);
-        //cout << "__________DATA(" << bestAtt.first << "=" << val << "_________" << endl;
-        //printData(vdata);
         if (vdata.size() <= 1)
             root->nextAtt.push_back(doVoting(data));
         else //recursive call
@@ -584,7 +559,6 @@ double calcEntropyGain(vector <vector <int> > &data, pair <int, int> &attribute)
     for (attCol = 0; attCol < lastCol; ++attCol)
         if (data[0][attCol] == attribute.first)
             break;
-    //cout << "attribute column number = " << attCol << endl;
     for (int recordNum = 1; recordNum < data.size(); ++recordNum)
     {
         if (data[recordNum][lastCol] == 1)
@@ -593,18 +567,8 @@ double calcEntropyGain(vector <vector <int> > &data, pair <int, int> &attribute)
             table[data[recordNum][attCol]].second += 1;
     }
     double sum = 0;
-    /*cout << "****************Table (att" << attribute.first << ")**************" << endl;
-    for (int val = 0; val < attribute.second; ++val)
-    {
-        cout << "val" << val << "-> true: " << table[val].first << ", false: " << table[val].second;
-        cout << ", entropy: " << calcEntropy(table[val].first, table[val].second) << endl;
-    }
-    cout << "*************FINI**************" << endl;
-    cout << endl;*/
     for (int val = 0; val < attribute.second; ++val)
         sum += calcEntropy(table[val].first, table[val].second);
-    //cout << "returning from function..." << endl;
-    //cout << "2 + 2 = " << sum << endl;
     return sum;
 }
 
@@ -644,8 +608,9 @@ void printTree(node* root, int tabs)
         printTree(child, tabs + 1);
 }
 
-void printData(vector <vector <int> > x)
+void printData(vector <vector <int> > &x)
 {
+    cout << "i'm in the function" << endl;
     for (int i = 0; i < x.size(); ++i)
     {
         for (int j = 0; j < x[0].size(); ++j)
