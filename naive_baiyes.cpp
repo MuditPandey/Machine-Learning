@@ -1,22 +1,30 @@
 #include <bits/stdc++.h>
 #include<ctype.h>
 using namespace std;
+struct result
+{
+    int tp;
+    int tn;
+    int fp;
+    int fn;
+};
 bool is_stopword(string word)
 {
     return false;
 }
-void load_count(string filename,map<string,int> &c_map )
+void load_count(string filename,map<string,int> &c_map,int &examples)
 {
     fstream fil;
     string path;
     if(filename=="pos.txt")
-        path="C:\\Users\\mudit\\Desktop\\Data\\Study\\ML\\Assignment-3\\aclImdb_v1\\aclImdb\\test\\pos";
+        path="C:\\Users\\mudit\\Desktop\\Data\\Study\\ML\\Assignment-3\\aclImdb_v1\\aclImdb\\train\\pos";
     else
-        path="C:\\Users\\mudit\\Desktop\\Data\\Study\\ML\\Assignment-3\\aclImdb_v1\\aclImdb\\test\\neg";
+        path="C:\\Users\\mudit\\Desktop\\Data\\Study\\ML\\Assignment-3\\aclImdb_v1\\aclImdb\\train\\neg";
     fil.open(filename,ios::in);
     string line;
     while(getline(fil,line))
     {
+        examples++;
         cout<<line<<endl;
         fstream fil2;
         string file=path+"\\"+line;
@@ -51,23 +59,105 @@ void load_count(string filename,map<string,int> &c_map )
     }
      fil.close();
 }
-void naive_baiyes(string filename,map<string,int> &p_map,map<string,int> &n_map)
+bool naive_baiyes(string filename,map<string,int> &p_map,map<string,int> &n_map,int &pos_count,int &neg_count,result &ans)
 {
+    fstream fil2;
+    string path;
+    bool pos=false;
+    if(filename=="test_pos.txt")
+    {
+        path="C:\\Users\\mudit\\Desktop\\Data\\Study\\ML\\Assignment-3\\aclImdb_v1\\aclImdb\\test\\pos";
+        pos=true;
+    }
+    else
+        path="C:\\Users\\mudit\\Desktop\\Data\\Study\\ML\\Assignment-3\\aclImdb_v1\\aclImdb\\test\\neg";
+    fil2.open(filename,ios::in);
+    string line;
+    while(getline(fil2,line))
+    {
+        cout<<line<<endl;
+        fstream fil2;
+        string file=path+"\\"+line;
+        cout<<"File:"<<file<<endl;
+        fstream fil;
+        fil.open(filename,ios::in);
+        string str;
+        double prob_pos=(double)pos_count/(pos_count+neg_count);
+        double prob_neg=neg_count/(pos_count+neg_count);
+        while(getline(fil,str))
+        {
+            int i=0;
+            while(i<str.length())
+            {
+                int start=i;
+                while((isalnum(str[i]) || str[i]=='-') && str[i]!=0)
+                    i++;
+                string word=str.substr(start,i-start);
+                //cout<<"Word:="<<word<<"."<<endl;
+                if(!is_stopword(word))
+                {
+                       if(p_map.find(word)!=p_map.end())
+                        prob_pos*=((double)p_map[word]/pos_count);
+                       if(n_map.find(word)!=n_map.end())
+                        prob_neg*=((double)n_map[word]/neg_count);
+                }
+                while(!isalnum(str[i])&& str[i]!=0)
+                    i++;
+            }
+        }
+        fil.close();
+        cout<<"Prob_pos:"<<prob_pos<<endl;
+        if(prob_pos > prob_neg && pos)
+        {
+            ans.tp++;
+        }
+        else if(prob_pos <= prob_neg && pos)
+        {
+            ans.fn++;
+        }
+        else if(prob_pos < prob_neg && !pos)
+        {
+            ans.tn++;
+        }
+        else if(prob_pos > prob_neg && !pos)
+        {
+            ans.fp++;
+        }
+    }
+    fil2.close();
+}
 
+void get_results(result &ans)
+{
+    //Put correct formulas
+    cout<<"Accuracy : "<<(double)(ans.tp+ans.tn)/(ans.tp+ans.tn+ans.fp+ans.fn)<<endl;
+    cout<<"Precision : "<<1<<endl;
+    cout<<"Recall : "<<1<<endl;
+    cout<<"F-Measure : "<<1<<endl;
 }
 int main()
 {
     map<string,int> pos;
     map<string,int> neg;
-    load_count("pos.txt",pos); //filename =list of all positive
-    load_count("neg.txt",neg)
+
+    int pos_count=0,neg_count=0;
+    load_count("pos.txt",pos,pos_count); //filename =list of all positive
+    load_count("neg.txt",neg,neg_count);
     //load_count("filename_neg_list.txt",neg); //filename =list of all negative
    for(map<string,int>::iterator it=pos.begin();it!=pos.end();it++)
     {
         cout<<it->first<<" "<<it->second<<endl;
     }
-    string testfile="test.txt";
-    naive_baiyes(testfile,pos,neg);
+    result final_ans;
+    final_ans.tp=0;
+    final_ans.tn=0;
+    final_ans.fp=0;
+    final_ans. fn=0;
+    string testfile="test_pos.txt";
+    naive_baiyes(testfile,pos,neg,pos_count,neg_count,final_ans);
+    testfile="test_neg.txt";
+    naive_baiyes(testfile,pos,neg,pos_count,neg_count,final_ans);
+    get_results(final_ans);
     return 0;
 }
 
