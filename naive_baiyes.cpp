@@ -1,5 +1,6 @@
 #include <bits/stdc++.h>
-#include<ctype.h>
+#include <stdlib.h>
+#include <ctype.h>
 using namespace std;
 struct result
 {
@@ -25,10 +26,13 @@ void load_count(string filename,map<string,int> &c_map,int &examples)
     while(getline(fil,line))
     {
         examples++;
-        cout<<line<<endl;
+        system("cls");
+        cout<<"Loading count\n";
+        cout<<"Progress:"<<floor((double)examples/12500*100)<<"%"<<endl;
+        //cout<<line<<endl;
         fstream fil2;
         string file=path+"\\"+line;
-        cout<<"File:"<<file<<endl;
+        //cout<<"File:"<<file<<endl;
         fil2.open(file,ios::in);
         string str;
         map<string,int> add;
@@ -38,8 +42,8 @@ void load_count(string filename,map<string,int> &c_map,int &examples)
             while(i<str.length())
             {
                 int start=i;
-                while((isalnum(str[i]) || str[i]=='-') && str[i]!=0)
-                    i++;
+                while(isalnum(str[i])&& str[i]!=0)
+                 i++;
                 string word=str.substr(start,i-start);
                 //cout<<"Word:="<<word<<"."<<endl;
                 if(!is_stopword(word))
@@ -75,7 +79,7 @@ bool naive_baiyes(string filename,map<string,int> &p_map,map<string,int> &n_map,
     string line;
     while(getline(fil2,line))
     {
-        cout<<line<<endl;
+        //cout<<line<<endl;
         fstream fil2;
         string file=path+"\\"+line;
         cout<<"File:"<<file<<endl;
@@ -83,14 +87,16 @@ bool naive_baiyes(string filename,map<string,int> &p_map,map<string,int> &n_map,
         fil.open(filename,ios::in);
         string str;
         double prob_pos=(double)pos_count/(pos_count+neg_count);
-        double prob_neg=neg_count/(pos_count+neg_count);
+        //cout<<"PROB_POS:"<<prob_pos;
+        double prob_neg=(double)neg_count/(pos_count+neg_count);
+        //cout<<" PROB_NEG:"<<prob_neg<<endl;
         while(getline(fil,str))
         {
             int i=0;
             while(i<str.length())
             {
                 int start=i;
-                while((isalnum(str[i]) || str[i]=='-') && str[i]!=0)
+                while(isalnum(str[i]) && str[i]!=0)
                     i++;
                 string word=str.substr(start,i-start);
                 //cout<<"Word:="<<word<<"."<<endl;
@@ -144,18 +150,21 @@ int main()
     load_count("pos.txt",pos,pos_count); //filename =list of all positive
     load_count("neg.txt",neg,neg_count);
     //load_count("filename_neg_list.txt",neg); //filename =list of all negative
-   for(map<string,int>::iterator it=pos.begin();it!=pos.end();it++)
+    cout<<"Printing count:\n";
+   /*for(map<string,int>::iterator it=pos.begin();it!=pos.end();it++)
     {
         cout<<it->first<<" "<<it->second<<endl;
-    }
+    }*/
     result final_ans;
     final_ans.tp=0;
     final_ans.tn=0;
     final_ans.fp=0;
     final_ans. fn=0;
     string testfile="test_pos.txt";
+    cout<<"Testing neg\n";
     naive_baiyes(testfile,pos,neg,pos_count,neg_count,final_ans);
     testfile="test_neg.txt";
+    cout<<"Testing pos\n";
     naive_baiyes(testfile,pos,neg,pos_count,neg_count,final_ans);
     get_results(final_ans);
     return 0;
